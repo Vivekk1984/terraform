@@ -1,0 +1,261 @@
+#--------------------------------------------------------------------
+# Locals
+locals {
+  # It's not possible assign multiple access policies to the same principal,
+  # so filter out any groups or users that are in both Write and Read lists
+  read_groups_unique = [for group in var.read_ad_group_member_group_names : group if ! contains(var.write_ad_group_member_group_names, group)]
+  read_users_unique  = [for group in var.read_ad_group_member_user_upns : group if ! contains(var.write_ad_group_member_user_upns, group)]
+}
+
+#--------------------------------------------------------------------
+# Data sources
+data "azurerm_client_config" "azure_config" {}
+
+data "azuread_user" "write_user" {
+  for_each            = toset(var.write_ad_group_member_user_upns)
+  user_principal_name = each.key
+}
+
+data "azuread_user" "read_user" {
+  for_each            = toset(local.read_users_unique)
+  user_principal_name = each.key
+}
+
+data "azuread_users" "owners" {
+  user_principal_names = var.ad_group_owner_user_upns
+}
+
+data "azuread_group" "write_group_member_group" {
+  for_each = toset(var.write_ad_group_member_group_names)
+  name     = each.key
+}
+
+data "azuread_group" "read_group_member_group" {
+  for_each = toset(local.read_groups_unique)
+  name     = each.key
+}
+
+#--------------------------------------------------------------------
+# Resources
+resource "azuread_group" "write_group" {
+  name                    = var.write_ad_group_name
+  owners                  = data.azuread_users.owners.object_ids
+  prevent_duplicate_names = true
+}
+
+resource "azuread_group" "read_group" {
+  name                    = var.read_ad_group_name
+  owners                  = data.azuread_users.owners.object_ids
+  prevent_duplicate_names = true
+}
+
+resource "azuread_group_member" "write_user_group_member" {
+  for_each = toset(var.write_ad_group_member_user_upns)
+
+  group_object_id  = azuread_group.write_group.id
+  member_object_id = data.azuread_user.write_user[each.key].id
+}
+
+resource "azuread_group_member" "read_user_group_member" {
+  for_each = toset(local.read_users_unique)
+
+  group_object_id  = azuread_group.read_group.id
+  member_object_id = data.azuread_user.read_user[each.key].id
+}
+
+resource "azuread_group_member" "write_group_group_member" {
+  for_each = toset(var.write_ad_group_member_group_names)
+
+  group_object_id  = azuread_group.write_group.id
+  member_object_id = data.azuread_group.write_group_member_group[each.key].id
+}
+
+resource "azuread_group_member" "read_group_group_member" {
+  for_each = toset(local.read_groups_unique)
+
+  group_object_id  = azuread_group.read_group.id
+  member_object_id = data.azuread_group.read_group_member_group[each.key].id
+}
+
+resource "azurerm_key_vault" "key_vault" {
+  location                        = var.location
+  name                            = var.name
+  resource_group_name             = var.resource_group_name
+  tenant_id                       = data.azurerm_client_config.azure_config.tenant_id
+  sku_name                        = "premium"
+  enabled_for_deployment          = true
+  enabled_for_disk_encryption     = true
+  enabled_for_template_deployment = true
+  purge_protection_enabled        = true
+  tags                            = var.tags
+}
+
+resource "azurerm_key_vault_access_policy" "key_vault_primary_write_policy" {
+
+  key_vault_id = azurerm_key_vault.key_vault.id
+  object_id    = azuread_group.write_group.id
+  tenant_id    = data.azurerm_client_config.azure_config.tenant_id
+
+  key_permissions = [
+    "Get",
+    "List",
+    "Update",
+    "Create",
+    "Import",
+    "Delete",
+    "Recover",
+    "Backup",
+    "Restore"
+  ]
+
+  secret_permissions = [
+    "Get",
+    "List",
+    "Set",
+    "Delete",
+    "Recover",
+    "Backup",
+    "Restore"
+  ]
+
+  certificate_permissions = [
+    "Get",
+    "List",
+    "Update",
+    "Create",
+    "Import",
+    "Delete",
+    "Recover",
+    "Backup",
+    "Restore",
+    "ManageContacts",
+    "ManageIssuers",
+    "GetIssuers",
+    "ListIssuers",
+    "SetIssuers",
+    "DeleteIssuers"
+  ]
+}
+
+resource "azurerm_key_vault_access_policy" "key_vault_primary_write_policy_service_principal" {
+  for_each = toset(var.write_service_principal_names)
+
+  key_vault_id = azurerm_key_vault.key_vault.id
+  object_id    = each.key
+  tenant_id    = data.azurerm_client_config.azure_config.tenant_id
+
+  key_permissions = [
+    "Get",
+    "List",
+    "Update",
+    "Create",
+    "Import",
+    "Delete",
+    "Recover",
+    "Backup",
+    "Restore"
+  ]
+
+  secret_permissions = [
+    "Get",
+    "List",
+    "Set",
+    "Delete",
+    "Recover",
+    "Backup",
+    "Restore"
+  ]
+
+  certificate_permissions = [
+    "Get",
+    "List",
+    "Update",
+    "Create",
+    "Import",
+    "Delete",
+    "Recover",
+    "Backup",
+    "Restore",
+    "ManageContacts",
+    "ManageIssuers",
+    "GetIssuers",
+    "ListIssuers",
+    "SetIssuers",
+    "DeleteIssuers"
+  ]
+}
+
+resource "azurerm_key_vault_access_policy" "key_vault_primary_read_policy" {
+  key_vault_id = azurerm_key_vault.key_vault.id
+  object_id    = azuread_group.read_group.id
+  tenant_id    = data.azurerm_client_config.azure_config.tenant_id
+
+  key_permissions = [
+    "Get",
+    "List"
+  ]
+
+  secret_permissions = [
+    "Get",
+    "List"
+  ]
+
+  certificate_permissions = [
+    "Get",
+    "List",
+    "GetIssuers",
+    "ListIssuers"
+  ]
+}
+
+resource "azurerm_key_vault_access_policy" "key_vault_primary_read_policy_service_principal" {
+  for_each = toset(var.read_service_principal_names)
+
+  key_vault_id = azurerm_key_vault.key_vault.id
+  object_id    = each.key
+  tenant_id    = data.azurerm_client_config.azure_config.tenant_id
+
+  key_permissions = [
+    "Get",
+    "List"
+  ]
+
+  secret_permissions = [
+    "Get",
+    "List"
+  ]
+
+  certificate_permissions = [
+    "Get",
+    "List",
+    "GetIssuers",
+    "ListIssuers"
+  ]
+}
+
+resource "azurerm_monitor_diagnostic_setting" "key_vault_diagnostics" {
+  name                           = "service"
+  target_resource_id             = azurerm_key_vault.key_vault.id
+  log_analytics_workspace_id     = var.log_analytics_workspace_id
+  eventhub_authorization_rule_id = var.eventhub_namespace_authorization_rule_id
+  eventhub_name                  = var.eventhub_name
+
+  log {
+    category = "AuditEvent"
+    enabled  = true
+    retention_policy {
+      enabled = true
+      days    = 180
+    }
+  }
+
+  # We're not using these but this block is required due to a provider bug
+  # https://github.com/terraform-providers/terraform-provider-azurerm/issues/3572
+  metric {
+    category = "AllMetrics"
+    enabled  = false
+    retention_policy {
+      enabled = false
+    }
+  }
+}

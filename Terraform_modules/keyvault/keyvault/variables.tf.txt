@@ -1,0 +1,85 @@
+variable "location" {
+  type        = string
+  description = "Azure Region of the Key Vault"
+}
+
+variable "name" {
+  type        = string
+  description = "Name of the Key Vault. Must comply to Azure name restrictions of 3-24 characters and containing only 0-9, a-z, A-Z, and -."
+}
+
+variable "resource_group_name" {
+  type        = string
+  description = "Resource group name to create the Azure Key Vault in"
+}
+
+variable "tags" {
+  type        = map(string)
+  description = "Map of tags assigned to the resource. The 'provisionedDate' will be assigned automatically and any changes will be ignored"
+}
+
+variable "log_analytics_workspace_id" {
+  type        = string
+  description = "Log Analystics Workspace ID used for AuditEvent logs"
+}
+
+variable "eventhub_namespace_authorization_rule_id" {
+  type        = string
+  description = "EventHub namespace ID used for AuditEvent logs"
+}
+
+variable "eventhub_name" {
+  type        = string
+  description = "EventHub name used for AuditEvent logs"
+}
+
+variable "write_ad_group_name" {
+  type        = string
+  description = "Azure AD group name which will be created and granted full write permissions to the Azure Key Vault. Must be in the same tenant as the AzureRM Provider used."
+}
+
+variable "read_ad_group_name" {
+  type        = string
+  description = "Azure AD group name which will be created and granted Read and List permissions to the Azure Key Vault. Must be in the same tenant as the AzureRM Provider used."
+}
+
+variable "write_ad_group_member_user_upns" {
+  type        = list(string)
+  description = "List of AAD user principal names which will be added as members of the group given Key Vault write access. Must be in the same tenant as the AzureRM Provider used."
+  default     = []
+}
+
+variable "read_ad_group_member_user_upns" {
+  type        = list(string)
+  description = "List of AAD user principal names which will be added as members of the group given Key Vault read access. Must be in the same tenant as the AzureRM Provider used."
+  default     = []
+}
+
+variable "write_ad_group_member_group_names" {
+  type        = list(string)
+  description = "List of existing AAD group names which will be added as members of the group given Key Vault write access. Must be in the same tenant as the AzureRM Provider used."
+  default     = []
+}
+
+variable "read_ad_group_member_group_names" {
+  type        = list(string)
+  description = "List of existing AAD group names which will be added as members of the group given Key Vault read access. Must be in the same tenant as the AzureRM Provider used."
+  default     = []
+}
+
+variable "ad_group_owner_user_upns" {
+  type        = list(string)
+  description = "List of existing AAD user UPNs which will be added as owners to the read and write AD groups (must specify at least 1)"
+}
+
+variable "write_service_principal_names" {
+  type        = list(string)
+  description = "List of service principal names which will be added as members of the group given Key Vault write access. Must be in the same tenant as the AzureRM Provider used."
+  default     = []
+}
+
+variable "read_service_principal_names" {
+  type        = list(string)
+  description = "List of service principal names which will be added as members of the group given Key Vault read access. Must be in the same tenant as the AzureRM Provider used."
+  default     = []
+}

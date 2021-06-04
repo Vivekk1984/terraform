@@ -1,0 +1,122 @@
+provider "azurerm" {
+  features {}
+}
+
+provider "azurerm" {
+  alias = "keyvault"
+  features {}
+}
+
+resource "azurerm_storage_account" "storage_account" {
+  name                      = var.storage_account_name
+  resource_group_name       = var.resource_group_name
+  location                  = var.location
+  account_kind              = "StorageV2"
+  account_tier              = var.account_tier
+  account_replication_type  = var.account_replication_type
+  access_tier               = var.access_tier
+  allow_blob_public_access  = var.allow_blob_public_access
+  is_hns_enabled            = var.is_hns_enabled
+  min_tls_version           = var.min_tls_version
+  enable_https_traffic_only = true
+  blob_properties {
+    dynamic "delete_retention_policy" {
+      for_each = var.enable_soft_delete ? [1] : []
+      content {
+        days = var.soft_delete_retention
+      }
+    }
+  }
+  identity {
+    type = "SystemAssigned"
+  }
+  network_rules {
+    default_action             = var.enable_firewall ? "Deny" : "Allow"
+    ip_rules                   = var.enable_firewall ? concat(var.allowed_ips, var.additional_allowed_ips) : null
+    virtual_network_subnet_ids = var.enable_firewall ? var.allowed_subnet_ids : null
+    bypass                     = var.enable_firewall ? var.network_rules_bypass : null
+  }
+  tags = var.tags
+}
+
+resource "azurerm_key_vault_access_policy" "encryption_key_vault_access_policy" {
+  provider = azurerm.keyvault
+
+  key_vault_id = var.key_vault_id
+  object_id    = azurerm_storage_account.storage_account.identity[0].principal_id
+  tenant_id    = azurerm_storage_account.storage_account.identity[0].tenant_id
+
+  key_permissions = ["get", "wrapKey", "unwrapKey"]
+}
+
+resource "azurerm_template_deployment" "encryption_deployment" {
+  deployment_mode     = "Incremental"
+  name                = "${formatdate("YYYYMMDD'T'hhmmssZ", timestamp())}-encryption-config"
+  resource_group_name = var.resource_group_name
+
+  template_body = <<-TEMPLATE
+    {
+      "$schema": "http://schema.management.azure.com/schemas/2014-04-01-preview/deploymentTemplate.json#",
+      "contentVersion": "1.0.0.0",
+      "parameters": {},
+      "resources": [
+        {
+          "name": "${azurerm_storage_account.storage_account.name}",
+          "type": "Microsoft.Storage/storageAccounts",
+          "apiVersion": "2018-02-01",
+          "location": "${azurerm_storage_account.storage_account.location}",
+          "properties": {
+            "encryption": {
+              "services": {
+                "blob": {
+                  "enabled": "true"
+                },
+                "file": {
+                  "enabled": "true"
+                }
+              },
+              "keySource": "Microsoft.Keyvault",
+              "keyvaultproperties": {
+                "keyname": "${var.key_vault_key_name}",
+                "keyversion": "${var.key_vault_key_version}",
+                "keyvaulturi": "${var.key_vault_uri}"
+              }
+            }
+          }
+        }
+      ]
+    }
+  TEMPLATE
+
+  lifecycle {
+    ignore_changes = [name]
+  }
+
+  depends_on = [azurerm_key_vault_access_policy.encryption_key_vault_access_policy]
+}
+
+resource "azurerm_storage_management_policy" "storage_account_management" {
+  count              = length(var.lifecycle_rules) > 0 ? 1 : 0
+  storage_account_id = azurerm_storage_account.storage_account.id
+  dynamic "rule" {
+    for_each = var.lifecycle_rules
+    content {
+      enabled = true
+      name    = rule.value["name"]
+      filters {
+        blob_types   = ["blockBlob"]
+        prefix_match = rule.value["prefix_match"]
+      }
+      actions {
+        base_blob {
+          tier_to_cool_after_days_since_modification_greater_than    = rule.value["tier_to_cool_days_since_modification"]
+          tier_to_archive_after_days_since_modification_greater_than = rule.value["tier_to_archive_days_since_modification"]
+          delete_after_days_since_modification_greater_than          = rule.value["delete_after_days_since_modification"]
+        }
+        snapshot {
+          delete_after_days_since_creation_greater_than = rule.value["delete_after_days_since_creation"]
+        }
+      }
+    }
+  }
+}

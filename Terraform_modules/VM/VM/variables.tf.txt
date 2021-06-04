@@ -1,0 +1,389 @@
+variable "vm_name" {
+  type        = string
+  description = "Name of the VM"
+}
+
+variable "vm_size" {
+  type        = string
+  description = "Specifies the size of the virtual machine (default 'Standard_B2s')"
+  default     = "Standard_B2s"
+}
+
+variable "vm_location" {
+  type        = string
+  description = "Azure Region of the VM"
+}
+
+variable "vm_resource_group_name" {
+  type        = string
+  description = "The name of the resource group in which the resources will be created"
+}
+
+variable "data_disk_resource_group_name_override" {
+  type        = string
+  description = "The name of the resource group in which the data_disks will be created. When used overrides 'vm_resource_group_name'."
+  default     = null
+}
+
+variable "network_interface_resource_group_name_override" {
+  type        = string
+  description = "The name of the resource group in which the network_interface will be created.When used overrides 'vm_resource_group_name'."
+  default     = null
+}
+
+variable "admin_username" {
+  type        = string
+  description = "The admin username of the VM that will be deployed (default 'mrcadmin'). Changing this requires the VM to be recreated."
+  default     = "mrcadmin"
+}
+
+variable "admin_password" {
+  type        = string
+  description = <<-DESC
+    The admin password to be used on the VMs that will be deployed. The password must meet the complexity requirements
+    of Azure. Required on Windows. On Linux, either this or 'admin_ssh_public_key' must be specified." Changing this
+    requires the VM to be recreated.
+  DESC
+  default     = null
+}
+
+variable "admin_ssh_public_key" {
+  type        = string
+  description = "The public SSH key for the admin user. Either this or 'admin_password' must be specified. Changing this requires the VM to be recreated."
+  default     = null
+}
+
+variable "azuread_group_ids" {
+  type        = list(string)
+  description = "List of Azure AD groups that the VMs will be assigned to"
+  default     = []
+}
+
+variable "network_subnet_id" {
+  type        = string
+  description = "The subnet id of the (pre-existing) subnet where the virtual machines will reside"
+}
+
+variable "network_ip_address" {
+  type        = string
+  description = "Static IP address of primary network interface. Must be within the address range of the subnet specified in 'network_subnet_id'. If empty, a dynamic IP will be used"
+  default     = ""
+}
+
+variable "enable_accelerated_networking" {
+  type        = bool
+  description = "Enables accelerated networking on VM Resources. Reference Readme for Limitations of parameter."
+  default     = false
+}
+
+variable "tags" {
+  type        = map(string)
+  description = "A map of the tags to use on the resources that are deployed with this module."
+}
+
+###
+# Disk Configuration
+###
+variable "data_disks" {
+  type = map(object({
+    lun     = number
+    caching = string
+    sku     = string
+    size_gb = number
+  }))
+
+  description = <<-DESC
+    Map of data disk suffix names to a disk configuration object with keys 'lun', 'caching', 'size_gb', and 'sku'. Valid values for
+    'caching' are 'None' (recommended for write-only or write-heavy workloads), 'ReadOnly' (recommended for read only or read/write workloads),
+    or 'ReadWrite' (only recommended for workloads capable of handling persisting cached writes to disk such as SQL Server).
+    If not specified, a single disk 'datadisk0' will be configured with lun = 0, caching = "ReadOnly", size_gb = 50, and sku = "Premium_LRS"
+  DESC
+
+  default = {
+    datadisk0 = {
+      lun     = 0
+      caching = "ReadOnly"
+      sku     = "Premium_LRS"
+      size_gb = 50
+    }
+  }
+}
+
+variable "os_disk_size_gb" {
+  type        = number
+  description = "OS disk size in GB. Must be equal to or larger than the size within the image (defaults to 'null' which uses the default image size)"
+  default     = null
+}
+
+variable "os_disk_sku" {
+  type        = string
+  description = "OS Storage Account type (default 'Premium_LRS')"
+  default     = "Premium_LRS"
+}
+
+###
+# OS Image Inputs
+###
+
+variable "os_image_simple" {
+  type        = string
+  description = "Specify UbuntuServer, WindowsServer, WindowsDesktop, RHEL, openSUSE-Leap, CentOS, Debian, CoreOS and SLES to get the latest image version of the specified OS. To use a specific image, specify os_image_reference instead."
+  default     = "WindowsServer"
+}
+
+variable "os_image_id" {
+  type        = string
+  description = "The resource ID of the image that you want to deploy if you are using a custom image. Overrides os_image_simple and os_image_reference. Note, need to provide os_image_is_windows = true for Windows custom images."
+  default     = null
+}
+
+variable "os_image_reference" {
+  type = object({
+    publisher = string
+    offer     = string
+    sku       = string
+    version   = string
+  })
+  description = "OS image reference information for Gallery Images. Overrides value of os_image_simple. Required keys: 'publisher', 'offer', 'sku', 'version'. An empty string for 'version' will default to the latest."
+  default = {
+    publisher = ""
+    offer     = ""
+    sku       = ""
+    version   = ""
+  }
+}
+
+variable "vm_plan_name" {
+  type        = string
+  description = "sets Azure Marketplace image plan information for a virtual machine"
+  default     = null
+}
+
+variable "os_image_is_windows" {
+  type        = string
+  description = "Specify whether the OS image is a Windows operating system. If not specified, it will be detected automatically based on the os_image_reference[\"publisher\"] or os_image_simple. Generally you should not need to set this unless you are using a custom image."
+  default     = ""
+}
+
+variable "os_image_license_type" {
+  type        = string
+  description = "Specify license type used for Azure Hybrid Benefit. Options are 'Windows_Client' for Windows 10, 'Windows_Server' for Windows Server, or '' for non Windows or to use on-demand licensing. Generally, you should not need to set this unless you are using a custom image"
+  default     = ""
+}
+
+####
+# Diagnostics settings
+####
+variable "install_monitoring_extension" {
+  type        = bool
+  description = "Install the Azure monitoring extension? Valid values are 'true' and 'false' (defaults to 'true')"
+  default     = true
+}
+
+variable "diag_install_extension" {
+  type        = bool
+  description = "Install Azure diagnostics extension? Valid values are 'true' and 'false' (defaults to 'true')"
+  default     = true
+}
+
+variable "diag_log_storage_account_name" {
+  type        = string
+  description = "Storage account name used to store diagnostic logs"
+}
+
+variable "diag_log_storage_account_rg" {
+  type        = string
+  description = "Resource group of the storage account name used to store diagnostic logs"
+}
+
+variable "diag_log_storage_account_sas_token" {
+  type        = string
+  description = "SAS Token used to access storage for the Linux Diagnostic Extension (ignored for Windows). Must have ss='bt', srt='co', and sp='acluw' permissions at a minimum and should NOT include the leading question mark"
+  default     = ""
+}
+
+variable "log_analytics" {
+  type = object({
+    workspace_id  = string
+    workspace_key = string
+  })
+  description = "Log analystics configuration for VM monitoring and diagnostics. Expected keys: 'workspace_id', 'workspace_key'. (ignored if diag_install_extension is false, required otherwise)"
+  default = {
+    workspace_id  = ""
+    workspace_key = ""
+  }
+}
+
+####
+# Domain settings
+###
+variable "ad_domain_join" {
+  type        = bool
+  description = "Whether to install an Azure extension on the VM to join the domain. Defaults to true."
+  default     = true
+}
+
+variable "ad_domain" {
+  type        = string
+  description = "Active directory domain of the VM. Ignored if 'ad_domain_join' is false. Defaults to 'mcjunkinredman.com'"
+  default     = "mcjunkinredman.com"
+}
+
+variable "ad_join_user" {
+  type        = string
+  description = "AD username of user with permissions to join VMs to the domain specified in ad_domain. Ignored on Linux VMs and if 'ad_domain_join' is false"
+  default     = "service.domainjoin"
+}
+
+variable "ad_join_pass" {
+  type        = string
+  description = "Password of the ad_join_user. Ignored if 'ad_domain_join' is false"
+  default     = ""
+}
+
+variable "ad_join_keyvault_secret" {
+  type        = string
+  description = "Name of the KeyVault Secret for domain vault. Default is service-prod-domainjoin"
+  default     = "service-prod-domainjoin"
+}
+
+variable "ad_join_keyvault_id" {
+  type        = string
+  description = "Id of the KeyVault containing the secret"
+  default     = "/subscriptions/c35b257f-9b63-45a5-805d-1890ea1d1120/resourceGroups/passvault-rg/providers/Microsoft.KeyVault/vaults/server-prod-vault"
+}
+####
+# VM Identity
+####
+variable "managed_identity_ids" {
+  type        = list(string)
+  description = "User managed identity IDs for the VMs."
+  default     = []
+}
+
+####
+# Chef variables
+####
+variable "chef_install_extension" {
+  type        = bool
+  description = "Should the VM(s) be managed by Chef? Valid values are true and false. Defaults to false"
+  default     = false
+}
+
+variable "chef_run_list" {
+  type        = string
+  description = "Chef runlist to configure in the Azure Chef extension. Defaults to 'role[core]' (ignored if chef_install_extension is false)"
+  default     = "role[core]"
+}
+
+variable "chef_server_url" {
+  type        = string
+  description = "Chef server URL including the protocol and path used to configure in the Azure Chef extension. Defaults to 'https://chef-prod.mcjunkinredman.com/organizations/mrcglobal' (ignored if chef_install_extension is false)"
+  default     = "https://chef-prod.mcjunkinredman.com/organizations/mrcglobal"
+}
+
+variable "chef_environment" {
+  type        = string
+  description = "Chef environment to place the node in. Defaults to 'dev' (ignored if chef_install_extension is false)"
+  default     = "dev"
+}
+
+# This is currently unused and not supported by our Chef bootstrap script. Currently we default to 30 minute intervals on all servers.
+# variable "chef_daemon_interval" {
+#   type        = number
+#   description = "Frequency (in minutes) at which the chef-service runs. Defaults to 30 (ignored if chef_install_extension is false)"
+#   default     = 30
+# }
+
+variable "chef_bootstrap_version" {
+  type        = number
+  description = "Chef client version to install. Defaults to 15 (ignored if chef_install_extension is false)"
+  default     = 15
+}
+
+variable "chef_validation_client_name" {
+  type        = string
+  description = "Client name of the organization validator used to create a new Chef client. Defaults to 'mrcglobal-validator'. (Ignored if chef_install_extension is false)"
+  default     = "mrcglobal-validator"
+}
+
+variable "chef_secrets" {
+  type = object({
+    certificate     = string
+    data_bag_secret = string
+    validation_key  = string
+  })
+  description = "Chef secrets used for registering VMs with Chef (required if chef_install_extension is true, ignored otherwise). Expected keys: 'validation_key' (must be base64 encoded), 'certificate', 'data_bag_secret'."
+  default = {
+    validation_key  = ""
+    certificate     = ""
+    data_bag_secret = ""
+  }
+}
+
+variable "chef_bootstrap_script" {
+  type = object({
+    storage_account_id = string
+    linux_script_uri   = string
+    windows_script_uri = string
+  })
+  description = "Object containing details of where the Chef bootstrap script is stored in Azure Storage. Required keys: 'storage_account_id', 'linux_script_uri', and 'windows_script_uri'. In order to access the storage account the VM needs to be part of the a Azure AD group with the Storage Blob Data Reader role."
+  default = {
+    storage_account_id = "/subscriptions/c35b257f-9b63-45a5-805d-1890ea1d1120/resourceGroups/storage-rg/providers/Microsoft.Storage/storageAccounts/stamrcitsoftwareeusp"
+    linux_script_uri   = "https://stamrcitsoftwareeusp.blob.core.windows.net/software/Chef/install_chef.sh"
+    windows_script_uri = "https://stamrcitsoftwareeusp.blob.core.windows.net/software/Chef/Install-ChefClient.ps1"
+  }
+}
+
+variable "chef_policy_name" {
+  type        = string
+  description = "The Chef policy name of the VM. Required if both 'chef_install_extension' and 'chef_use_policyfiles' are 'true'"
+  default     = null
+}
+
+variable "chef_policy_group" {
+  type        = string
+  description = "The name of the Chef policy group. Required if both 'chef_install_extension' and 'chef_use_policyfiles' are 'true'"
+  default     = null
+}
+
+variable "chef_use_policyfiles" {
+  type        = bool
+  description = "Whether to use Chef Policyfiles to bootstrap the VM. Requires specifying 'chef_policy_name' and 'chef_policy_group' if this and 'chef_install_extension' are both 'true'"
+  default     = false
+}
+
+variable "availability_set_id" {
+  type        = string
+  description = "The ID of the availability set"
+}
+
+variable "auto_shutdown" {
+  type        = bool
+  description = "Whether to enable auto-shutdown for non-prod VMs (based on 'environmentType' tag). Defaults to 'true'. No effect for prod VMs."
+  default     = true
+}
+
+variable "disk_encryption_set_id" {
+  type        = string
+  default     = null
+  description = "The ID of the Disk Encryption Set. Must be in the same region and subscription as the VMs"
+}
+
+variable "proximity_placement_group_id" {
+  type        = string
+  default     = null
+  description = "The ID of the Proximity placement group. proximity placement group can be assigned to only one Azure resource group"
+}
+
+variable "availability_zone" {
+  type        = string
+  description = "The Zone in which this Virtual Machine should be created. VM's in Proximity placement group should be in same AZ"
+  default     = null
+}
+
+variable "timezone" {
+  type        = string
+  description = "The timezone setting of the VM. Check https://jackstromberg.com/2017/01/list-of-time-zones-consumed-by-azure/ for a list of timezones available in Azure"
+  default     = null
+}

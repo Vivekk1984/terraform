@@ -1,0 +1,25 @@
+output "key_vault_id" {
+  description = "Azure Resource ID of the Key Vault"
+  value       = azurerm_key_vault.key_vault.id
+}
+
+output "key_vault_name" {
+  description = "NAme of the Key Vault"
+  value       = azurerm_key_vault.key_vault.name
+}
+
+output "key_vault_uri" {
+  description = "URI of the Key Vault, typically in the format 'https://<vault name>.vault.azure.net'"
+  value       = azurerm_key_vault.key_vault.vault_uri
+}
+
+output "read_group_object_id" {
+  description = "Azure AD group object ID given read access to the Key Vault via access policy"
+  value       = azuread_group.read_group.id
+}
+
+output "write_group_object_id" {
+  description = "Azure AD group object ID given wriite access to the Key Vault via access policy"
+  value       = azuread_group.write_group.id
+}
+© 2021 GitHub, Inc.

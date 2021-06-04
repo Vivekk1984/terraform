@@ -1,0 +1,14 @@
+terraform {
+  required_version = ">= 0.12"
+  required_providers {
+    azurerm = ">= 2.12"
+    azuread = "~> 1.0"
+  }
+}
+
+provider "azurerm" {
+  subscription_id = "c35b257f-9b63-45a5-805d-1890ea1d1120"
+  tenant_id       = "77958d16-8217-4ba1-9558-885d03a4ebbf"
+  alias           = "keyvault"
+  features {}
+}
