@@ -1,8 +1,3 @@
-variable "tfe_workspace_name" {
-  type        = string
-  description = "Terraform Cloud workspace name"
-}
-
 locals {
   ## Resource Group Details
   resource_group_name     = "test-resources-test-eastus-rg"
@@ -15,13 +10,12 @@ locals {
 
 locals {
   global_tags = {
-    application = local.application
-    businessContact = "kesarwani.vivek@gmail.com"
-    businessUnit = "information-technology"
-    costcenter = "09.564.603.361"
-    environmentType = local.environment_type
+    application      = local.application
+    businessContact  = "kesarwani.vivek@gmail.com"
+    businessUnit     = "information-technology"
+    costcenter       = "09.564.603.361"
+    environmentType  = local.environment_type
     technicalContact = "kesarwani.vivek@gmail.com"
-    terraformWorkspace = var.tfe_workspace_name
   }
 
 }
